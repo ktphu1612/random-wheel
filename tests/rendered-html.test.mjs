@@ -19,6 +19,8 @@ test("ships Vietnamese landing, admin and participant surfaces", async () => {
   assert.match(admin, /Tạo vòng quay/);
   assert.match(admin, /Phần thưởng & xác suất/);
   assert.match(wheel, /Kết quả của bạn/);
+  assert.match(wheel, /wheel-label-anchor/);
+  assert.match(wheel, /flipLabel/);
   assert.match(layout, /lang="vi"/);
   assert.doesNotMatch(`${home}${admin}${wheel}`, /codex-preview|SkeletonPreview/);
 });

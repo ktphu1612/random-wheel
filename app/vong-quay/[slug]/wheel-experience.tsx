@@ -236,16 +236,24 @@ export function WheelExperience({ slug }: { slug: string }) {
             {data.prizes.map((prize, index) => {
               const angle = index * (360 / data.prizes.length) +
                 180 / data.prizes.length;
+              const flipLabel = angle > 90 && angle < 270;
               return (
-                <span
-                  className="wheel-label"
+                <div
+                  className="wheel-label-anchor"
                   key={prize.id}
                   style={{
-                    transform: `rotate(${angle}deg) translateY(-42%)`,
+                    transform: `rotate(${angle}deg)`,
                   }}
                 >
-                  {prize.name}
-                </span>
+                  <span
+                    className="wheel-label"
+                    style={{
+                      transform: `translateX(-50%) rotate(${flipLabel ? 180 : 0}deg)`,
+                    }}
+                  >
+                    {prize.name}
+                  </span>
+                </div>
               );
             })}
             <div className="wheel-hub">QUAY</div>
