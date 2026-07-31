@@ -104,6 +104,32 @@ export async function POST(
         );
       }
       const spinId = makeId("spn");
+      const reservation = await db
+        .prepare(
+          "UPDATE prizes SET remaining = remaining - 1 WHERE id = ? AND campaign_id = ? AND remaining > 0 RETURNING remaining",
+        )
+        .bind(prize.id, data.campaign.id)
+        .all<{ remaining: number }>();
+      if (!reservation.results.length) continue;
+
+      const consumption = await db
+        .prepare(
+          "UPDATE access_codes SET spins_used = spins_used + 1 WHERE id = ? AND campaign_id = ? AND status = 'active' AND spins_used < spins_limit RETURNING spins_limit, spins_used",
+        )
+        .bind(code.id, data.campaign.id)
+        .all<{ spins_limit: number; spins_used: number }>();
+      if (!consumption.results.length) {
+        await db
+          .prepare(
+            "UPDATE prizes SET remaining = remaining + 1 WHERE id = ? AND campaign_id = ?",
+          )
+          .bind(prize.id, data.campaign.id)
+          .run();
+        return NextResponse.json(
+          { error: "Bạn đã sử dụng hết lượt quay." },
+          { status: 409 },
+        );
+      }
       try {
         await db
           .prepare(
@@ -118,12 +144,7 @@ export async function POST(
             prize.name,
           )
           .run();
-        const updatedCode = await db
-          .prepare(
-            "SELECT spins_limit, spins_used FROM access_codes WHERE id = ?",
-          )
-          .bind(code.id)
-          .first<{ spins_limit: number; spins_used: number }>();
+        const updatedCode = consumption.results[0];
         return NextResponse.json({
           result: {
             id: spinId,
@@ -137,6 +158,18 @@ export async function POST(
             : 0,
         });
       } catch (error) {
+        await db.batch([
+          db
+            .prepare(
+              "UPDATE prizes SET remaining = remaining + 1 WHERE id = ? AND campaign_id = ?",
+            )
+            .bind(prize.id, data.campaign.id),
+          db
+            .prepare(
+              "UPDATE access_codes SET spins_used = MAX(0, spins_used - 1) WHERE id = ? AND campaign_id = ?",
+            )
+            .bind(code.id, data.campaign.id),
+        ]);
         const message = error instanceof Error ? error.message : "";
         if (message.includes("UNIQUE") || message.includes("request")) {
           const existing = await db
@@ -145,15 +178,7 @@ export async function POST(
             .first<SpinRecord>();
           if (existing) return NextResponse.json({ result: existing, idempotent: true });
         }
-        if (!message.includes("NO_STOCK")) {
-          if (message.includes("NO_SPINS")) {
-            return NextResponse.json(
-              { error: "Bạn đã sử dụng hết lượt quay." },
-              { status: 409 },
-            );
-          }
-          throw error;
-        }
+        throw error;
       }
     }
     return NextResponse.json(

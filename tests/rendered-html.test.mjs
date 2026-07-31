@@ -41,9 +41,10 @@ test("keeps durable state and server-side spin protections configured", async ()
   assert.match(schema, /spins_request_uq/);
   assert.match(spinRoute, /requestId/);
   assert.match(spinRoute, /choosePrize/);
-  assert.match(migration, /spins_before_insert_inventory/);
-  assert.match(migration, /NO_STOCK/);
-  assert.match(migration, /NO_SPINS/);
+  assert.match(spinRoute, /remaining = remaining - 1/);
+  assert.match(spinRoute, /remaining > 0 RETURNING remaining/);
+  assert.match(spinRoute, /spins_used < spins_limit RETURNING/);
+  assert.doesNotMatch(migration, /CREATE TRIGGER/);
 });
 
 test("removes the starter preview and includes a social card", async () => {
