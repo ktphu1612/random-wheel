@@ -1,6 +1,22 @@
 import { NextResponse } from "next/server";
-import { getCampaignBySlug } from "../../../../../lib/data";
-import { cookieValue, verifyToken } from "../../../../../lib/security";
+import {
+  createCampaignDevice,
+  getCampaignBySlug,
+  getCampaignDevice,
+} from "../../../../../lib/data";
+import {
+  DEVICE_COOKIE_MAX_AGE,
+  deviceCookieName,
+  matchesDeviceSession,
+  type DeviceSession,
+} from "../../../../../lib/device-policy";
+import {
+  cookieValue,
+  getD1,
+  sessionCookie,
+  signToken,
+  verifyToken,
+} from "../../../../../lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -17,36 +33,35 @@ export async function GET(
         { status: 404 },
       );
     }
-    const cookieName = `qt_player_${data.campaign.id.slice(-12)}`;
-    const session = await verifyToken<{
-      campaignId: string;
-      codeId: string;
-      exp: number;
-    }>(cookieValue(request, cookieName));
-    let participant = null;
-    let history: unknown[] = [];
-    if (session?.campaignId === data.campaign.id) {
-      const codeId = session.codeId;
-      const { getD1 } = await import("../../../../../lib/security");
-      const db = getD1();
-      participant = await db
-        .prepare(
-          "SELECT id, code_hint, participant_name, spins_limit, spins_used, status FROM access_codes WHERE id = ? AND campaign_id = ?",
-        )
-        .bind(codeId, data.campaign.id)
-        .first();
-      if (participant) {
-        history = (
-          await db
-            .prepare(
-              "SELECT id, prize_id, prize_name, fulfillment_status, created_at FROM spins WHERE access_code_id = ? ORDER BY created_at DESC",
-            )
-            .bind(codeId)
-            .all()
-        ).results;
-      }
+
+    const cookieName = deviceCookieName(data.campaign.id);
+    const session = await verifyToken<DeviceSession>(
+      cookieValue(request, cookieName),
+    );
+    let device = matchesDeviceSession(session, data.campaign.id)
+      ? await getCampaignDevice(data.campaign.id, session!.deviceId)
+      : null;
+    let token: string | null = null;
+
+    if (!device) {
+      device = await createCampaignDevice(data.campaign.id);
+      if (!device) throw new Error("DEVICE_CREATE_FAILED");
+      token = await signToken({
+        campaignId: data.campaign.id,
+        deviceId: device.id,
+        exp: Date.now() + DEVICE_COOKIE_MAX_AGE * 1000,
+      });
     }
-    return NextResponse.json({
+
+    const history = (
+      await getD1()
+        .prepare(
+          "SELECT id, prize_id, prize_name, fulfillment_status, created_at FROM spins WHERE access_code_id = ? ORDER BY created_at DESC",
+        )
+        .bind(device.id)
+        .all()
+    ).results;
+    const response = NextResponse.json({
       campaign: {
         id: data.campaign.id,
         name: data.campaign.name,
@@ -64,9 +79,27 @@ export async function GET(
         imageUrl: prize.image_url,
         remaining: prize.remaining,
       })),
-      participant,
+      device: {
+        id: device.id,
+        code_hint: device.code_hint,
+        spins_limit: device.spins_limit,
+        spins_used: device.spins_used,
+        created_at: device.created_at,
+      },
       history,
     });
+    if (token) {
+      response.headers.set(
+        "Set-Cookie",
+        sessionCookie(
+          request,
+          cookieName,
+          token,
+          DEVICE_COOKIE_MAX_AGE,
+        ),
+      );
+    }
+    return response;
   } catch {
     return NextResponse.json(
       { error: "Chưa thể tải vòng quay. Vui lòng thử lại." },

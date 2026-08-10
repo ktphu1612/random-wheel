@@ -65,3 +65,18 @@ test("distinguishes devices and scopes retries to one device", async () => {
   assert.match(schema, /spins_device_request_uq/);
   assert.doesNotMatch(schema, /spins_request_uq/);
 });
+test("creates a device session without an access-code claim", async () => {
+  const route = await readFile(
+    new URL("app/api/public/campaigns/[slug]/route.ts", root),
+    "utf8",
+  );
+  const data = await readFile(new URL("lib/data.ts", root), "utf8");
+  assert.match(data, /kind = 'device'/);
+  assert.match(route, /deviceCookieName/);
+  assert.match(route, /DEVICE_COOKIE_MAX_AGE/);
+  assert.match(route, /Set-Cookie/);
+  assert.match(route, /device:/);
+  await assert.rejects(
+    access(new URL("app/api/public/campaigns/[slug]/claim/route.ts", root)),
+  );
+});

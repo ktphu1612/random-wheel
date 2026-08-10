@@ -2,8 +2,10 @@ import type {
   AccessCodeRecord,
   CampaignRecord,
   CampaignStatus,
+  DeviceRecord,
   PrizeRecord,
 } from "./types";
+import { deviceLabel } from "./device-policy";
 import { getD1, makeId, sha256 } from "./security";
 
 export function resolvedStatus(
@@ -104,14 +106,23 @@ export async function getCampaignBySlug(slug: string) {
   };
 }
 
-export async function getAccessCode(campaignId: string, rawCode: string) {
-  const hash = await sha256(rawCode.trim().toUpperCase());
+export async function getCampaignDevice(campaignId: string, deviceId: string) {
   return getD1()
     .prepare(
-      "SELECT * FROM access_codes WHERE campaign_id = ? AND code_hash = ?",
+      "SELECT * FROM access_codes WHERE id = ? AND campaign_id = ? AND kind = 'device'",
     )
-    .bind(campaignId, hash)
-    .first<AccessCodeRecord>();
+    .bind(deviceId, campaignId)
+    .first<DeviceRecord>();
+}
+
+export async function createCampaignDevice(campaignId: string) {
+  const id = makeId("dev");
+  return getD1()
+    .prepare(
+      "INSERT INTO access_codes (id, campaign_id, kind, code_hash, code_hint, spins_limit) VALUES (?, ?, 'device', ?, ?, 1) RETURNING *",
+    )
+    .bind(id, campaignId, await sha256(id), deviceLabel(id))
+    .first<DeviceRecord>();
 }
 
 export function choosePrize(prizes: PrizeRecord[]) {

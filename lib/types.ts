@@ -41,8 +41,11 @@ export type AccessCodeRecord = {
   spins_limit: number;
   spins_used: number;
   status: "active" | "blocked" | "revoked";
+  kind: "code" | "device";
   created_at: string;
 };
+
+export type DeviceRecord = AccessCodeRecord & { kind: "device" };
 
 export type SpinRecord = {
   id: string;
