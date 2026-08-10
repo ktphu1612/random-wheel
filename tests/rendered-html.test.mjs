@@ -121,13 +121,15 @@ test("lists devices and exposes an authenticated non-stacking reset", async () =
   assert.match(resetRoute, /spins_limit = spins_used \+ 1/);
 });
 test("keeps scripts portable and removes obsolete code helpers", async () => {
-  const [packageJson, security, data] = await Promise.all([
+  const [packageJson, security, data, eslintConfig] = await Promise.all([
     readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("lib/security.ts", root), "utf8"),
     readFile(new URL("lib/data.ts", root), "utf8"),
+    readFile(new URL("eslint.config.mjs", root), "utf8"),
   ]);
   assert.doesNotMatch(packageJson, /WRANGLER_LOG_PATH=/);
   assert.match(packageJson, /--experimental-strip-types --test/);
   assert.doesNotMatch(security, /randomCode/);
   assert.doesNotMatch(data, /getAccessCode|MAYMAN2026/);
+  assert.match(eslintConfig, /\.worktrees\/\*\*/);
 });
