@@ -9,10 +9,10 @@ test("ships Vietnamese landing, admin and participant surfaces", async () => {
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/admin/admin-dashboard.tsx", root), "utf8"),
     readFile(
-      new URL("app/vong-quay/[slug]/wheel-experience.tsx", root),
+      new URL("app/[slug]/wheel-experience.tsx", root),
       "utf8",
     ),
-    readFile(new URL("app/vong-quay/[slug]/page.tsx", root), "utf8"),
+    readFile(new URL("app/[slug]/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
   ]);
   assert.match(home, /Mỗi lượt quay/);
@@ -139,4 +139,18 @@ test("builds the Worker against the production D1 database", async () => {
   assert.match(viteConfig, /random-wheel-db/);
   assert.match(viteConfig, /migrations_dir:\s*"\.\.\/\.\.\/drizzle"/);
   assert.doesNotMatch(viteConfig, /00000000-0000-4000-8000-000000000000/);
+});
+
+test("serves campaigns at root and redirects legacy URLs", async () => {
+  const [home, admin, legacyPage, createRoute] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/admin/admin-dashboard.tsx", root), "utf8"),
+    readFile(new URL("app/vong-quay/[slug]/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/admin/campaigns/route.ts", root), "utf8"),
+  ]);
+  assert.doesNotMatch(`${home}${admin}`, /\/vong-quay\//);
+  assert.match(legacyPage, /permanentRedirect/);
+  assert.match(legacyPage, /`\/\$\{slug\}`/);
+  assert.match(createRoute, /RESERVED_SLUGS/);
+  assert.match(createRoute, /"admin", "api"/);
 });

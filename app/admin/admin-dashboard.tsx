@@ -532,12 +532,12 @@ function CampaignEditor({
               {statusLabel[campaign.status] ?? campaign.status}
             </span>
           </div>
-          <Link href={`/vong-quay/${campaign.slug}`} target="_blank">
-            /vong-quay/{campaign.slug} <span>↗</span>
+          <Link href={`/${campaign.slug}`} target="_blank">
+            /{campaign.slug} <span>↗</span>
           </Link>
         </div>
         <div className="detail-actions">
-          <button onClick={() => navigator.clipboard.writeText(`${location.origin}/vong-quay/${campaign.slug}`)}>Sao chép link</button>
+          <button onClick={() => navigator.clipboard.writeText(`${location.origin}/${campaign.slug}`)}>Sao chép link</button>
           {campaign.status === "active" ? (
             <button className="button-warning" onClick={() => action("pause")} disabled={busy}>Tạm dừng</button>
           ) : campaign.status !== "ended" ? (

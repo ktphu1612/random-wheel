@@ -52,7 +52,7 @@ export default function Home() {
             </Link>
             <Link
               className="text-link"
-              href="/vong-quay/mua-he-may-man"
+              href="/mua-he-may-man"
             >
               Xem bản trải nghiệm
             </Link>

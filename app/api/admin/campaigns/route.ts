@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { audit } from "../../../../lib/data";
 import { getD1, makeId, requireAdmin } from "../../../../lib/security";
 
+const RESERVED_SLUGS = new Set(["admin", "api"]);
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
     const db = getD1();
     const id = makeId("cmp");
     let slug = slugify(name) || `vong-quay-${Date.now()}`;
+    if (RESERVED_SLUGS.has(slug)) slug = `vong-quay-${slug}`;
     const existing = await db
       .prepare("SELECT id FROM campaigns WHERE slug = ?")
       .bind(slug)
