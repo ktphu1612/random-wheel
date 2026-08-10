@@ -80,3 +80,17 @@ test("creates a device session without an access-code claim", async () => {
     access(new URL("app/api/public/campaigns/[slug]/claim/route.ts", root)),
   );
 });
+test("enforces device ownership and device-scoped retries", async () => {
+  const spinRoute = await readFile(
+    new URL("app/api/public/campaigns/[slug]/spin/route.ts", root),
+    "utf8",
+  );
+  assert.match(spinRoute, /deviceCookieName/);
+  assert.match(spinRoute, /kind = 'device'/);
+  assert.match(
+    spinRoute,
+    /request_id = \? AND campaign_id = \? AND access_code_id = \?/,
+  );
+  assert.match(spinRoute, /spins_used < spins_limit RETURNING/);
+  assert.doesNotMatch(spinRoute, /Vui lòng nhập mã tham gia/);
+});

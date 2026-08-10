@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { choosePrize, getCampaignBySlug } from "../../../../../../lib/data";
-import type { AccessCodeRecord, SpinRecord } from "../../../../../../lib/types";
+import {
+  deviceCookieName,
+  matchesDeviceSession,
+  remainingDeviceSpins,
+  type DeviceSession,
+} from "../../../../../../lib/device-policy";
+import type { DeviceRecord, SpinRecord } from "../../../../../../lib/types";
 import {
   checkRateLimit,
   cookieValue,
@@ -18,26 +24,22 @@ export async function POST(
     const { slug } = await params;
     const data = await getCampaignBySlug(slug);
     if (!data) {
-      return NextResponse.json({ error: "Vòng quay không tồn tại." }, { status: 404 });
-    }
-    const session = await verifyToken<{
-      campaignId: string;
-      codeId: string;
-      exp: number;
-    }>(
-      cookieValue(
-        request,
-        `qt_player_${data.campaign.id.slice(-12)}`,
-      ),
-    );
-    if (!session || session.campaignId !== data.campaign.id) {
       return NextResponse.json(
-        { error: "Vui lòng nhập mã tham gia trước." },
+        { error: "Vòng quay không tồn tại." },
+        { status: 404 },
+      );
+    }
+    const session = await verifyToken<DeviceSession>(
+      cookieValue(request, deviceCookieName(data.campaign.id)),
+    );
+    if (!matchesDeviceSession(session, data.campaign.id)) {
+      return NextResponse.json(
+        { error: "Không tìm thấy phiên thiết bị." },
         { status: 401 },
       );
     }
     const allowed = await checkRateLimit(
-      `spin:${session.codeId}:${requestFingerprint(request)}`,
+      `spin:${session!.deviceId}:${requestFingerprint(request)}`,
       12,
       60,
     );
@@ -64,32 +66,36 @@ export async function POST(
     const body = (await request.json()) as { requestId?: string };
     const requestId = body.requestId?.trim();
     if (!requestId || requestId.length > 100) {
-      return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
-    }
-    const db = getD1();
-    const previous = await db
-      .prepare("SELECT * FROM spins WHERE request_id = ?")
-      .bind(requestId)
-      .first<SpinRecord>();
-    if (previous) {
-      return NextResponse.json({
-        result: previous,
-        idempotent: true,
-      });
-    }
-    const code = await db
-      .prepare("SELECT * FROM access_codes WHERE id = ? AND campaign_id = ?")
-      .bind(session.codeId, data.campaign.id)
-      .first<AccessCodeRecord>();
-    if (!code || code.status !== "active") {
       return NextResponse.json(
-        { error: "Mã tham gia đã bị khóa hoặc thu hồi." },
-        { status: 403 },
+        { error: "Yêu cầu không hợp lệ." },
+        { status: 400 },
       );
     }
-    if (code.spins_used >= code.spins_limit) {
+    const db = getD1();
+    const device = await db
+      .prepare(
+        "SELECT * FROM access_codes WHERE id = ? AND campaign_id = ? AND kind = 'device'",
+      )
+      .bind(session!.deviceId, data.campaign.id)
+      .first<DeviceRecord>();
+    if (!device || device.status !== "active") {
       return NextResponse.json(
-        { error: "Bạn đã sử dụng hết lượt quay." },
+        { error: "Không tìm thấy phiên thiết bị." },
+        { status: 401 },
+      );
+    }
+    const previous = await db
+      .prepare(
+        "SELECT * FROM spins WHERE request_id = ? AND campaign_id = ? AND access_code_id = ?",
+      )
+      .bind(requestId, data.campaign.id, device.id)
+      .first<SpinRecord>();
+    if (previous) {
+      return NextResponse.json({ result: previous, idempotent: true });
+    }
+    if (device.spins_used >= device.spins_limit) {
+      return NextResponse.json(
+        { error: "Bạn đã hết lượt quay." },
         { status: 409 },
       );
     }
@@ -114,9 +120,9 @@ export async function POST(
 
       const consumption = await db
         .prepare(
-          "UPDATE access_codes SET spins_used = spins_used + 1 WHERE id = ? AND campaign_id = ? AND status = 'active' AND spins_used < spins_limit RETURNING spins_limit, spins_used",
+          "UPDATE access_codes SET spins_used = spins_used + 1 WHERE id = ? AND campaign_id = ? AND kind = 'device' AND status = 'active' AND spins_used < spins_limit RETURNING spins_limit, spins_used",
         )
-        .bind(code.id, data.campaign.id)
+        .bind(device.id, data.campaign.id)
         .all<{ spins_limit: number; spins_used: number }>();
       if (!consumption.results.length) {
         await db
@@ -126,7 +132,7 @@ export async function POST(
           .bind(prize.id, data.campaign.id)
           .run();
         return NextResponse.json(
-          { error: "Bạn đã sử dụng hết lượt quay." },
+          { error: "Bạn đã hết lượt quay." },
           { status: 409 },
         );
       }
@@ -138,13 +144,13 @@ export async function POST(
           .bind(
             spinId,
             data.campaign.id,
-            code.id,
+            device.id,
             prize.id,
             requestId,
             prize.name,
           )
           .run();
-        const updatedCode = consumption.results[0];
+        const updatedDevice = consumption.results[0];
         return NextResponse.json({
           result: {
             id: spinId,
@@ -153,8 +159,11 @@ export async function POST(
             color: prize.color,
             createdAt: new Date().toISOString(),
           },
-          spinsRemaining: updatedCode
-            ? Math.max(0, updatedCode.spins_limit - updatedCode.spins_used)
+          spinsRemaining: updatedDevice
+            ? remainingDeviceSpins(
+                updatedDevice.spins_limit,
+                updatedDevice.spins_used,
+              )
             : 0,
         });
       } catch (error) {
@@ -166,17 +175,21 @@ export async function POST(
             .bind(prize.id, data.campaign.id),
           db
             .prepare(
-              "UPDATE access_codes SET spins_used = MAX(0, spins_used - 1) WHERE id = ? AND campaign_id = ?",
+              "UPDATE access_codes SET spins_used = MAX(0, spins_used - 1) WHERE id = ? AND campaign_id = ? AND kind = 'device'",
             )
-            .bind(code.id, data.campaign.id),
+            .bind(device.id, data.campaign.id),
         ]);
         const message = error instanceof Error ? error.message : "";
         if (message.includes("UNIQUE") || message.includes("request")) {
           const existing = await db
-            .prepare("SELECT * FROM spins WHERE request_id = ?")
-            .bind(requestId)
+            .prepare(
+              "SELECT * FROM spins WHERE request_id = ? AND campaign_id = ? AND access_code_id = ?",
+            )
+            .bind(requestId, data.campaign.id, device.id)
             .first<SpinRecord>();
-          if (existing) return NextResponse.json({ result: existing, idempotent: true });
+          if (existing) {
+            return NextResponse.json({ result: existing, idempotent: true });
+          }
         }
         throw error;
       }
