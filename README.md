@@ -1,34 +1,33 @@
-# Quay Vui
+# Random Wheel
 
-Ứng dụng vòng quay trúng thưởng chạy trên vinext và Cloudflare Workers, lưu dữ liệu lâu dài trong D1.
+A lucky spin app running on vinext and Cloudflare Workers, with persistent data storage in D1.
 
-## Luồng người chơi
+## Player Flow
 
-- Mở đường dẫn của một chiến dịch, không cần nhập mã.
-- Trình duyệt nhận cookie thiết bị riêng cho chiến dịch.
-- Mỗi thiết bị có một lượt quay ban đầu.
-- Kết quả và lịch sử được lưu phía server.
-- Xóa cookie, dùng ẩn danh hoặc trình duyệt khác được tính là thiết bị mới.
+- Open a campaign URL, no code required.
+- The browser receives a device-specific cookie for the campaign.
+- Each device gets one initial spin.
+- Results and history are stored server-side.
 
-## Quản trị
+## Admin
 
-- Đăng nhập bằng `ADMIN_PASSWORD`.
-- Tạo, tạm dừng, kết thúc và nhân bản chiến dịch.
-- Quản lý phần thưởng, xác suất, kho quà và kết quả bàn giao.
-- Xem danh sách thiết bị và reset thiết bị được chọn về đúng một lượt khả dụng.
+- Login with `ADMIN_PASSWORD`.
+- Create, Pause, End & Clone campaigns.
+- Manage prizes, probabilities, inventory, and handover results.
+- View the device list and reset selected devices to exactly one available spin.
 
-## Cấu hình
+## Configuration
 
-Tạo `.env` từ `.env.example` cho môi trường cục bộ:
+Create an `.env` from `.env.example` for local environment:
 
 ```env
 ADMIN_PASSWORD=replace-with-a-long-password
 SESSION_SECRET=replace-with-at-least-32-random-characters
 ```
 
-D1 được khai báo bằng binding `DB` trong `.openai/hosting.json`.
+D1 is declared using the `DB` binding in `.openai/hosting.json`.
 
-## Lệnh
+## Command
 
 ```bash
 npm install
@@ -38,4 +37,4 @@ npm test
 npm run db:generate
 ```
 
-Yêu cầu Node.js `>=22.13.0`.
+Require Node.js `>=22.13.0`.
