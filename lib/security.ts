@@ -176,10 +176,3 @@ export async function checkRateLimit(
 export function makeId(prefix: string) {
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 }
-
-export function randomCode(length = 12) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join("");
-}
