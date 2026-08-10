@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     ).results;
     const results = await Promise.all(
       campaigns.map(async (campaign) => {
-        const [prizes, codeSummary, spinSummary, pendingSummary] =
+        const [prizes, deviceSummary, spinSummary, pendingSummary] =
           await Promise.all([
             db
               .prepare(
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
               .all(),
             db
               .prepare(
-                "SELECT COUNT(*) AS total FROM access_codes WHERE campaign_id = ?",
+                "SELECT COUNT(*) AS total FROM access_codes WHERE campaign_id = ? AND kind = 'device'",
               )
               .bind(campaign.id)
               .first<{ total: number }>(),
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
             prizeRows.reduce((sum, prize) => sum + prize.remaining, 0),
           ),
           prizes: prizes.results,
-          codeCount: codeSummary?.total ?? 0,
+          deviceCount: deviceSummary?.total ?? 0,
           spinCount: spinSummary?.total ?? 0,
           pendingCount: pendingSummary?.total ?? 0,
         };

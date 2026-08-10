@@ -23,7 +23,6 @@ export async function POST(request: Request) {
       description?: string;
       startsAt?: string;
       endsAt?: string;
-      defaultSpins?: number;
     };
     const name = body.name?.trim();
     if (!name) {
@@ -51,7 +50,7 @@ export async function POST(request: Request) {
     if (existing) slug = `${slug}-${Date.now().toString().slice(-5)}`;
     await db
       .prepare(
-        "INSERT INTO campaigns (id, name, slug, description, status, starts_at, ends_at, default_spins) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?)",
+        "INSERT INTO campaigns (id, name, slug, description, status, starts_at, ends_at) VALUES (?, ?, ?, ?, 'draft', ?, ?)",
       )
       .bind(
         id,
@@ -60,7 +59,6 @@ export async function POST(request: Request) {
         body.description?.trim() ?? "",
         startsAt,
         endsAt,
-        Math.max(1, Math.min(100, Number(body.defaultSpins) || 1)),
       )
       .run();
     await audit("campaign.created", "campaign", id, { name, slug });

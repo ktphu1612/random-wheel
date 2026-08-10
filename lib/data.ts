@@ -33,7 +33,6 @@ export async function ensureSeedData() {
   const campaignId = "cmp_demo_mua_he";
   const startsAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const endsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const codeHash = await sha256("MAYMAN2026");
   await db.batch([
     db
       .prepare(
@@ -67,17 +66,6 @@ export async function ensureSeedData() {
         "INSERT OR IGNORE INTO prizes (id, campaign_id, name, color, quantity, remaining, probability, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       )
       .bind("prz_demo_4", campaignId, "Móc khóa vui", "#4E7CFF", 25, 25, 25, 3),
-    db
-      .prepare(
-        "INSERT OR IGNORE INTO access_codes (id, campaign_id, code_hash, code_hint, participant_name, spins_limit) VALUES (?, ?, ?, ?, ?, 2)",
-      )
-      .bind(
-        "cod_demo_1",
-        campaignId,
-        codeHash,
-        "MAYM••••2026",
-        "Khách trải nghiệm",
-      ),
   ]);
 }
 

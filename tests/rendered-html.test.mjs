@@ -94,3 +94,22 @@ test("enforces device ownership and device-scoped retries", async () => {
   assert.match(spinRoute, /spins_used < spins_limit RETURNING/);
   assert.doesNotMatch(spinRoute, /Vui lòng nhập mã tham gia/);
 });
+test("lists devices and exposes an authenticated non-stacking reset", async () => {
+  const [dashboardRoute, detailRoute, resetRoute] = await Promise.all([
+    readFile(new URL("app/api/admin/dashboard/route.ts", root), "utf8"),
+    readFile(new URL("app/api/admin/campaigns/[id]/route.ts", root), "utf8"),
+    readFile(
+      new URL(
+        "app/api/admin/campaigns/[id]/devices/[deviceId]/reset/route.ts",
+        root,
+      ),
+      "utf8",
+    ),
+  ]);
+  assert.match(dashboardRoute, /deviceCount/);
+  assert.match(dashboardRoute, /kind = 'device'/);
+  assert.match(detailRoute, /devices:/);
+  assert.match(detailRoute, /kind = 'device'/);
+  assert.match(resetRoute, /requireAdmin/);
+  assert.match(resetRoute, /spins_limit = spins_used \+ 1/);
+});

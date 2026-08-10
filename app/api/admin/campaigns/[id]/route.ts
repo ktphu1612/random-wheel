@@ -12,7 +12,7 @@ export async function GET(
   }
   const { id } = await params;
   const db = getD1();
-  const [campaign, prizes, codes, spins, auditRows] = await Promise.all([
+  const [campaign, prizes, devices, spins, auditRows] = await Promise.all([
     db.prepare("SELECT * FROM campaigns WHERE id = ?").bind(id).first(),
     db
       .prepare("SELECT * FROM prizes WHERE campaign_id = ? ORDER BY position")
@@ -20,13 +20,13 @@ export async function GET(
       .all(),
     db
       .prepare(
-        "SELECT id, code_hint, participant_name, contact, spins_limit, spins_used, status, created_at FROM access_codes WHERE campaign_id = ? ORDER BY created_at DESC LIMIT 500",
+        "SELECT id, code_hint, spins_limit, spins_used, created_at FROM access_codes WHERE campaign_id = ? AND kind = 'device' ORDER BY created_at DESC LIMIT 500",
       )
       .bind(id)
       .all(),
     db
       .prepare(
-        "SELECT s.*, a.code_hint, a.participant_name FROM spins s JOIN access_codes a ON a.id = s.access_code_id WHERE s.campaign_id = ? ORDER BY s.created_at DESC LIMIT 1000",
+        "SELECT s.*, a.code_hint FROM spins s JOIN access_codes a ON a.id = s.access_code_id WHERE s.campaign_id = ? ORDER BY s.created_at DESC LIMIT 1000",
       )
       .bind(id)
       .all(),
@@ -43,7 +43,7 @@ export async function GET(
   return NextResponse.json({
     campaign,
     prizes: prizes.results,
-    codes: codes.results,
+    devices: devices.results,
     spins: spins.results,
     audit: auditRows.results,
   });
@@ -63,7 +63,6 @@ export async function PATCH(
       description?: string;
       startsAt?: string;
       endsAt?: string;
-      defaultSpins?: number;
       prizes?: Array<{
         id?: string;
         name: string;
@@ -154,14 +153,13 @@ export async function PATCH(
     }
     await db
       .prepare(
-        "UPDATE campaigns SET name = ?, description = ?, starts_at = ?, ends_at = ?, default_spins = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE campaigns SET name = ?, description = ?, starts_at = ?, ends_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       )
       .bind(
         body.name?.trim() || campaign.name,
         body.description?.trim() ?? campaign.description,
         body.startsAt ? new Date(body.startsAt).toISOString() : campaign.starts_at,
         body.endsAt ? new Date(body.endsAt).toISOString() : campaign.ends_at,
-        Math.max(1, Math.min(100, Number(body.defaultSpins) || campaign.default_spins)),
         id,
       )
       .run();
