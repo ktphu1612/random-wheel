@@ -40,7 +40,7 @@ test("keeps durable state and server-side spin protections configured", async ()
   ]);
   assert.match(hosting, /"d1":\s*"DB"/);
   assert.match(schema, /access_codes/);
-  assert.match(schema, /spins_request_uq/);
+  assert.match(schema, /spins_device_request_uq/);
   assert.match(spinRoute, /requestId/);
   assert.match(spinRoute, /choosePrize/);
   assert.match(spinRoute, /remaining = remaining - 1/);
@@ -56,4 +56,12 @@ test("removes the starter preview and includes a social card", async () => {
   );
   const packageJson = await readFile(new URL("package.json", root), "utf8");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+});
+
+test("distinguishes devices and scopes retries to one device", async () => {
+  const schema = await readFile(new URL("db/schema.ts", root), "utf8");
+  assert.match(schema, /kind: text\("kind"\).*default\("code"\)/s);
+  assert.match(schema, /access_codes_campaign_kind_idx/);
+  assert.match(schema, /spins_device_request_uq/);
+  assert.doesNotMatch(schema, /spins_request_uq/);
 });

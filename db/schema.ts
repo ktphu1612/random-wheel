@@ -51,6 +51,7 @@ export const accessCodes = sqliteTable(
     campaignId: text("campaign_id")
       .notNull()
       .references(() => campaigns.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().default("code"),
     codeHash: text("code_hash").notNull(),
     codeHint: text("code_hint").notNull(),
     participantName: text("participant_name"),
@@ -66,6 +67,7 @@ export const accessCodes = sqliteTable(
       table.codeHash,
     ),
     index("access_codes_campaign_idx").on(table.campaignId),
+    index("access_codes_campaign_kind_idx").on(table.campaignId, table.kind),
   ],
 );
 
@@ -92,7 +94,10 @@ export const spins = sqliteTable(
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
-    uniqueIndex("spins_request_uq").on(table.requestId),
+    uniqueIndex("spins_device_request_uq").on(
+      table.accessCodeId,
+      table.requestId,
+    ),
     index("spins_campaign_idx").on(table.campaignId),
     index("spins_code_idx").on(table.accessCodeId),
   ],

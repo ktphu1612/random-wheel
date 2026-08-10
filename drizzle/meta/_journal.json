@@ -8,6 +8,13 @@
       "when": 1785472097333,
       "tag": "0000_ordinary_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786340068074,
+      "tag": "0001_device_spin_limit",
+      "breakpoints": true
     }
   ]
 }
