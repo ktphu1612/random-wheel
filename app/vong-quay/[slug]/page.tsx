@@ -3,7 +3,7 @@ import { WheelExperience } from "./wheel-experience";
 
 export const metadata: Metadata = {
   title: "Tham gia vòng quay",
-  description: "Nhập mã tham gia và thử vận may của bạn.",
+  description: "Quay ngay và khám phá phần thưởng của bạn.",
 };
 
 export default async function WheelPage({

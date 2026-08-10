@@ -5,13 +5,14 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("ships Vietnamese landing, admin and participant surfaces", async () => {
-  const [home, admin, wheel, layout] = await Promise.all([
+  const [home, admin, wheel, wheelPage, layout] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/admin/admin-dashboard.tsx", root), "utf8"),
     readFile(
       new URL("app/vong-quay/[slug]/wheel-experience.tsx", root),
       "utf8",
     ),
+    readFile(new URL("app/vong-quay/[slug]/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
   ]);
   assert.match(home, /Mỗi lượt quay/);
@@ -26,6 +27,7 @@ test("ships Vietnamese landing, admin and participant surfaces", async () => {
   assert.doesNotMatch(admin, /Tạo mã|Nhập CSV|Lượt mặc định mỗi mã/);
   assert.match(wheel, /wheel-label-anchor/);
   assert.match(wheel, /flipLabel/);
+  assert.doesNotMatch(wheelPage, /Nh\u1eadp m\u00e3 tham gia/);
   assert.match(layout, /lang="vi"/);
   assert.doesNotMatch(`${home}${admin}${wheel}`, /codex-preview|SkeletonPreview/);
 });
