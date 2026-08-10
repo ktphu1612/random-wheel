@@ -133,3 +133,10 @@ test("keeps scripts portable and removes obsolete code helpers", async () => {
   assert.doesNotMatch(data, /getAccessCode|MAYMAN2026/);
   assert.match(eslintConfig, /\.worktrees\/\*\*/);
 });
+
+test("builds the Worker against the production D1 database", async () => {
+  const viteConfig = await readFile(new URL("vite.config.ts", root), "utf8");
+  assert.match(viteConfig, /random-wheel-db/);
+  assert.match(viteConfig, /migrations_dir:\s*"\.\.\/\.\.\/drizzle"/);
+  assert.doesNotMatch(viteConfig, /00000000-0000-4000-8000-000000000000/);
+});
