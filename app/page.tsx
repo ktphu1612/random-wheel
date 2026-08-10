@@ -4,7 +4,7 @@ const features = [
   {
     number: "01",
     title: "Tạo nhiều vòng quay",
-    text: "Mỗi chiến dịch có link, thời gian, kho quà và danh sách mã riêng.",
+    text: "Mỗi chiến dịch có link, thời gian, kho quà và thiết bị tham gia riêng.",
   },
   {
     number: "02",
@@ -57,9 +57,6 @@ export default function Home() {
               Xem bản trải nghiệm
             </Link>
           </div>
-          <p className="demo-code">
-            Mã trải nghiệm: <strong>MAYMAN2026</strong>
-          </p>
         </div>
         <div className="hero-art" aria-hidden="true">
           <div className="orbit orbit-one" />
@@ -81,7 +78,7 @@ export default function Home() {
       <section className="trust-strip" aria-label="Các lợi ích chính">
         <span>Không vượt kho quà</span>
         <i />
-        <span>Giới hạn lượt theo mã</span>
+        <span>Một lượt trên mỗi thiết bị</span>
         <i />
         <span>Kết quả khóa trên máy chủ</span>
       </section>

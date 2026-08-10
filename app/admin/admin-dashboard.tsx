@@ -27,10 +27,9 @@ type CampaignSummary = {
   status: string;
   starts_at: string;
   ends_at: string;
-  default_spins: number;
   updated_at?: string;
   prizes: Prize[];
-  codeCount: number;
+  deviceCount: number;
   spinCount: number;
   pendingCount: number;
 };
@@ -38,21 +37,18 @@ type CampaignSummary = {
 type CampaignDetail = {
   campaign: CampaignSummary;
   prizes: Prize[];
-  codes: Array<{
+  devices: Array<{
     id: string;
     code_hint: string;
-    participant_name: string | null;
-    contact: string | null;
     spins_limit: number;
     spins_used: number;
-    status: string;
     created_at: string;
   }>;
   spins: Array<{
     id: string;
+    access_code_id: string;
     prize_name: string;
     code_hint: string;
-    participant_name: string | null;
     fulfillment_status: string;
     fulfillment_note: string | null;
     created_at: string;
@@ -273,7 +269,7 @@ export function AdminDashboard() {
         </Link>
         <nav aria-label="Quản trị">
           <button className="active"><span>◫</span> Tổng quan</button>
-          <button onClick={() => setTab("codes")}><span>⌗</span> Mã tham gia</button>
+          <button onClick={() => setTab("devices")}><span>⌗</span> Thiết bị</button>
           <button onClick={() => setTab("results")}><span>✦</span> Kết quả</button>
         </nav>
         <div className="sidebar-bottom">
@@ -341,7 +337,7 @@ export function AdminDashboard() {
                   <span className={`campaign-dot ${campaign.status}`} />
                   <div>
                     <strong>{campaign.name}</strong>
-                    <small>{campaign.spinCount} lượt · {campaign.codeCount} mã</small>
+                    <small>{campaign.spinCount} lượt · {campaign.deviceCount} thiết bị</small>
                   </div>
                   <span className={`status-badge ${campaign.status}`}>
                     {statusLabel[campaign.status] ?? campaign.status}
@@ -353,7 +349,7 @@ export function AdminDashboard() {
 
           {detail ? (
             <CampaignEditor
-              key={`${detail.campaign.id}:${detail.campaign.updated_at ?? ""}:${detail.codes.length}:${detail.spins.length}`}
+              key={`${detail.campaign.id}:${detail.campaign.updated_at ?? ""}:${detail.devices.length}:${detail.spins.length}`}
               detail={detail}
               tab={tab}
               setTab={setTab}
@@ -401,7 +397,6 @@ function CreateCampaign({
     description: "",
     startsAt: localInputDate(defaultCampaignStart),
     endsAt: localInputDate(defaultCampaignEnd),
-    defaultSpins: 1,
   });
   const [busy, setBusy] = useState(false);
 
@@ -444,8 +439,6 @@ function CreateCampaign({
           <div><label>Bắt đầu</label><input type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} required /></div>
           <div><label>Kết thúc</label><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} required /></div>
         </div>
-        <label>Số lượt mặc định</label>
-        <input type="number" min="1" max="100" value={form.defaultSpins} onChange={(event) => setForm({ ...form, defaultSpins: Number(event.target.value) })} />
         <button className="button button-primary button-block" disabled={busy}>
           {busy ? "Đang tạo…" : "Tạo bản nháp"} <span>→</span>
         </button>
@@ -473,7 +466,6 @@ function CampaignEditor({
 }) {
   const [campaign, setCampaign] = useState(detail.campaign);
   const [prizes, setPrizes] = useState<Prize[]>(detail.prizes);
-  const [codeCount, setCodeCount] = useState(10);
 
   const probabilityTotal = useMemo(
     () => prizes.reduce((sum, prize) => sum + Number(prize.probability || 0), 0),
@@ -491,11 +483,14 @@ function CampaignEditor({
           description: campaign.description,
           startsAt: campaign.starts_at,
           endsAt: campaign.ends_at,
-          defaultSpins: campaign.default_spins,
-          prizes: prizes.map((prize) => ({
-            ...prize,
-            imageUrl: prize.image_url ?? null,
-          })),
+          ...(tab === "prizes"
+            ? {
+                prizes: prizes.map((prize) => ({
+                  ...prize,
+                  imageUrl: prize.image_url ?? null,
+                })),
+              }
+            : {}),
         }),
       });
       setNotice("Đã lưu thay đổi.");
@@ -522,68 +517,6 @@ function CampaignEditor({
       await refresh();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Không thể cập nhật.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function generateCodes() {
-    setBusy(true);
-    try {
-      const payload = await requestJson(
-        `/api/admin/campaigns/${campaign.id}/codes`,
-        {
-          method: "POST",
-          body: JSON.stringify({ mode: "generate", count: codeCount }),
-        },
-      );
-      downloadCsv(`${campaign.slug}-ma-moi.csv`, [
-        ["Mã", "Tên", "Liên hệ", "Số lượt"],
-        ...payload.created.map(
-          (item: {
-            code: string;
-            participantName: string;
-            contact: string;
-            spinsLimit: number;
-          }) => [item.code, item.participantName, item.contact, item.spinsLimit],
-        ),
-      ]);
-      setNotice(`Đã tạo ${payload.created.length} mã và tải file CSV.`);
-      await refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Không thể tạo mã.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function importCsv(file: File) {
-    setBusy(true);
-    try {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter(Boolean);
-      const rows = lines.slice(1).map((line) => {
-        const values = line
-          .split(",")
-          .map((value) => value.trim().replace(/^"|"$/g, ""));
-        return {
-          code: values[0],
-          participantName: values[1],
-          contact: values[2],
-          spinsLimit: Number(values[3]) || campaign.default_spins,
-        };
-      });
-      const payload = await requestJson(
-        `/api/admin/campaigns/${campaign.id}/codes`,
-        {
-          method: "POST",
-          body: JSON.stringify({ mode: "import", rows }),
-        },
-      );
-      setNotice(`Đã nhập ${payload.created.length} mã.`);
-      await refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Không thể nhập CSV.");
     } finally {
       setBusy(false);
     }
@@ -618,7 +551,7 @@ function CampaignEditor({
         {[
           ["overview", "Cấu hình"],
           ["prizes", `Phần thưởng (${prizes.length})`],
-          ["codes", `Mã tham gia (${detail.codes.length})`],
+          ["devices", `Thiết bị (${detail.devices.length})`],
           ["results", `Kết quả (${detail.spins.length})`],
           ["audit", "Nhật ký"],
         ].map(([value, label]) => (
@@ -636,7 +569,6 @@ function CampaignEditor({
             <div className="wide"><label>Mô tả</label><textarea value={campaign.description} onChange={(event) => setCampaign({ ...campaign, description: event.target.value })} /></div>
             <div><label>Bắt đầu</label><input type="datetime-local" value={localInputDate(campaign.starts_at)} onChange={(event) => setCampaign({ ...campaign, starts_at: new Date(event.target.value).toISOString() })} /></div>
             <div><label>Kết thúc</label><input type="datetime-local" value={localInputDate(campaign.ends_at)} onChange={(event) => setCampaign({ ...campaign, ends_at: new Date(event.target.value).toISOString() })} /></div>
-            <div><label>Lượt mặc định mỗi mã</label><input type="number" min="1" max="100" value={campaign.default_spins} onChange={(event) => setCampaign({ ...campaign, default_spins: Number(event.target.value) })} /></div>
           </div>
           <div className="editor-footer">
             {campaign.status !== "ended" ? <button className="danger-link" onClick={() => action("end")}>Kết thúc vòng quay</button> : <span />}
@@ -670,27 +602,49 @@ function CampaignEditor({
         </div>
       ) : null}
 
-      {tab === "codes" ? (
+      {tab === "devices" ? (
         <div className="editor-section">
           <div className="editor-heading">
-            <div><h3>Mã tham gia</h3><p>Mã chỉ hiển thị đầy đủ trong file tải xuống lúc vừa tạo.</p></div>
-            <div className="code-tools">
-              <input type="number" min="1" max="500" value={codeCount} onChange={(event) => setCodeCount(Number(event.target.value))} />
-              <button className="button button-primary" onClick={generateCodes} disabled={busy}>Tạo mã</button>
-              <label className="button button-ghost">Nhập CSV<input type="file" accept=".csv" hidden onChange={(event) => event.target.files?.[0] && importCsv(event.target.files[0])} /></label>
-            </div>
+            <div><h3>Thiết bị</h3><p>Mỗi trình duyệt có một lượt ban đầu trong chiến dịch này.</p></div>
           </div>
           <div className="data-table">
-            <div className="table-row table-head"><span>Mã</span><span>Người tham gia</span><span>Lượt</span><span>Trạng thái</span><span /></div>
-            {detail.codes.map((item) => (
-              <div className="table-row" key={item.id}>
-                <strong>{item.code_hint}</strong>
-                <span>{item.participant_name || "Chưa gán"}<small>{item.contact}</small></span>
-                <span>{item.spins_used}/{item.spins_limit}</span>
-                <span className={`status-badge ${item.status}`}>{item.status === "active" ? "Hoạt động" : item.status === "blocked" ? "Đã khóa" : "Thu hồi"}</span>
-                <button onClick={async () => { await requestJson(`/api/admin/codes/${item.id}`, { method: "PATCH", body: JSON.stringify({ status: item.status === "active" ? "blocked" : "active" }) }); await refresh(); }}>{item.status === "active" ? "Khóa" : "Mở"}</button>
-              </div>
-            ))}
+            <div className="table-row table-head"><span>Thiết bị</span><span>Khởi tạo</span><span>Lượt</span><span>Kết quả gần nhất</span><span /></div>
+            {detail.devices.map((item) => {
+              const latest = detail.spins.find(
+                (spin) => spin.access_code_id === item.id,
+              );
+              return (
+                <div className="table-row" key={item.id}>
+                  <strong>{item.code_hint}</strong>
+                  <span>{new Date(item.created_at).toLocaleString("vi-VN")}</span>
+                  <span>{Math.max(0, item.spins_limit - item.spins_used)} còn lại</span>
+                  <span>{latest?.prize_name ?? "Chưa quay"}</span>
+                  <button
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      setNotice("");
+                      try {
+                        await requestJson(
+                          `/api/admin/campaigns/${campaign.id}/devices/${item.id}/reset`,
+                          { method: "POST" },
+                        );
+                        setNotice(`Đã reset lượt cho ${item.code_hint}.`);
+                        await refresh();
+                      } catch (error) {
+                        setNotice(
+                          error instanceof Error ? error.message : "Không thể reset lượt.",
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Reset lượt
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -699,13 +653,13 @@ function CampaignEditor({
         <div className="editor-section">
           <div className="editor-heading">
             <div><h3>Kết quả & giao quà</h3><p>Chỉ admin có thể xem toàn bộ danh sách người thắng.</p></div>
-            <button className="button button-ghost" onClick={() => downloadCsv(`${campaign.slug}-ket-qua.csv`, [["Thời gian", "Người tham gia", "Mã", "Phần thưởng", "Trạng thái"], ...detail.spins.map((spin) => [spin.created_at, spin.participant_name, spin.code_hint, spin.prize_name, spin.fulfillment_status])])}>Xuất CSV</button>
+            <button className="button button-ghost" onClick={() => downloadCsv(`${campaign.slug}-ket-qua.csv`, [["Thời gian", "Thiết bị", "Phần thưởng", "Trạng thái"], ...detail.spins.map((spin) => [spin.created_at, spin.code_hint, spin.prize_name, spin.fulfillment_status])])}>Xuất CSV</button>
           </div>
           <div className="data-table results-table">
-            <div className="table-row table-head"><span>Người tham gia</span><span>Phần thưởng</span><span>Thời gian</span><span>Giao quà</span><span /></div>
+            <div className="table-row table-head"><span>Thiết bị</span><span>Phần thưởng</span><span>Thời gian</span><span>Giao quà</span><span /></div>
             {detail.spins.map((spin) => (
               <div className="table-row" key={spin.id}>
-                <span><strong>{spin.participant_name || "Không có tên"}</strong><small>{spin.code_hint}</small></span>
+                <strong>{spin.code_hint}</strong>
                 <strong>{spin.prize_name}</strong>
                 <span>{new Date(spin.created_at).toLocaleString("vi-VN")}</span>
                 <span className={`fulfillment ${spin.fulfillment_status}`}>{spin.fulfillment_status === "fulfilled" ? "Đã trao" : "Chờ trao"}</span>

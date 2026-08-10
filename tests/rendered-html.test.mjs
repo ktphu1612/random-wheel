@@ -15,10 +15,15 @@ test("ships Vietnamese landing, admin and participant surfaces", async () => {
     readFile(new URL("app/layout.tsx", root), "utf8"),
   ]);
   assert.match(home, /Mỗi lượt quay/);
-  assert.match(home, /MAYMAN2026/);
+  assert.doesNotMatch(home, /MAYMAN2026|Mã trải nghiệm/);
   assert.match(admin, /Tạo vòng quay/);
   assert.match(admin, /Phần thưởng & xác suất/);
   assert.match(wheel, /Kết quả của bạn/);
+  assert.doesNotMatch(wheel, /Nhập mã của bạn|access-code|claim/);
+  assert.match(wheel, /Bạn đã hết lượt quay\./);
+  assert.match(admin, /Thiết bị/);
+  assert.match(admin, /Reset lượt/);
+  assert.doesNotMatch(admin, /Tạo mã|Nhập CSV|Lượt mặc định mỗi mã/);
   assert.match(wheel, /wheel-label-anchor/);
   assert.match(wheel, /flipLabel/);
   assert.match(layout, /lang="vi"/);

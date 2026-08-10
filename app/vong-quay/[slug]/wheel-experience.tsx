@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Prize = {
   id: string;
@@ -22,13 +22,12 @@ type CampaignData = {
     remaining: number;
   };
   prizes: Prize[];
-  participant: {
+  device: {
     id: string;
-    participant_name: string | null;
     code_hint: string;
     spins_limit: number;
     spins_used: number;
-    status: string;
+    created_at: string;
   } | null;
   history: Array<{
     id: string;
@@ -64,9 +63,7 @@ const stateCopy: Record<string, { title: string; text: string }> = {
 
 export function WheelExperience({ slug }: { slug: string }) {
   const [data, setData] = useState<CampaignData | null>(null);
-  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [notice, setNotice] = useState("");
@@ -108,27 +105,6 @@ export function WheelExperience({ slug }: { slug: string }) {
       )
       .join(",")})`;
   }, [data]);
-
-  async function claim(event: FormEvent) {
-    event.preventDefault();
-    setSubmitting(true);
-    setNotice("");
-    try {
-      const response = await fetch(`/api/public/campaigns/${slug}/claim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error);
-      setCode("");
-      await load();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Mã không hợp lệ.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function spin() {
     if (!data || spinning) return;
@@ -185,8 +161,8 @@ export function WheelExperience({ slug }: { slug: string }) {
     );
   }
 
-  const remainingSpins = data.participant
-    ? Math.max(0, data.participant.spins_limit - data.participant.spins_used)
+  const remainingSpins = data.device
+    ? Math.max(0, data.device.spins_limit - data.device.spins_used)
     : 0;
   const state = stateCopy[data.campaign.status];
   const secondsToStart = Math.max(
@@ -215,11 +191,10 @@ export function WheelExperience({ slug }: { slug: string }) {
           <p className="eyebrow eyebrow-light"><span /> Vòng quay đang diễn ra</p>
           <h1>{data.campaign.name}</h1>
           <p>{data.campaign.description}</p>
-          {data.participant ? (
+          {data.device ? (
             <div className="participant-chip">
-              <span>Xin chào</span>
-              <strong>{data.participant.participant_name || "Người tham gia"}</strong>
-              <small>{data.participant.code_hint}</small>
+              <span>Thiết bị của bạn</span>
+              <strong>{data.device.code_hint}</strong>
             </div>
           ) : null}
         </div>
@@ -269,29 +244,14 @@ export function WheelExperience({ slug }: { slug: string }) {
               <p>{state.text}</p>
               {countdown ? <strong>{countdown}</strong> : null}
             </div>
-          ) : !data.participant ? (
-            <form className="code-form" onSubmit={claim}>
-              <span className="step-label">BƯỚC 1 / 2</span>
-              <h2>Nhập mã của bạn</h2>
-              <p>Mỗi mã chỉ sử dụng được trong vòng quay này.</p>
-              <label htmlFor="access-code">Mã tham gia</label>
-              <input
-                id="access-code"
-                value={code}
-                onChange={(event) => setCode(event.target.value.toUpperCase())}
-                placeholder="VD: MAYMAN2026"
-                autoComplete="one-time-code"
-                required
-              />
-              <button className="button button-primary button-block" disabled={submitting}>
-                {submitting ? "Đang kiểm tra…" : "Xác nhận mã"} <span>→</span>
-              </button>
-              <small>Không chia sẻ mã của bạn cho người khác.</small>
-            </form>
           ) : (
             <div className="spin-controls">
-              <span className="step-label">BƯỚC 2 / 2</span>
-              <h2>Sẵn sàng thử vận may?</h2>
+              <span className="step-label">LƯỢT QUAY CỦA BẠN</span>
+              <h2>
+                {remainingSpins > 0
+                  ? "Sẵn sàng thử vận may?"
+                  : "Bạn đã hết lượt quay."}
+              </h2>
               <div className="spin-balance">
                 <span>Lượt còn lại</span>
                 <strong>{remainingSpins}</strong>
@@ -314,7 +274,7 @@ export function WheelExperience({ slug }: { slug: string }) {
         </div>
       </section>
 
-      {data.participant && data.history.length ? (
+      {data.device && data.history.length ? (
         <section className="history-section">
           <div>
             <p className="eyebrow"><span /> Riêng tư và rõ ràng</p>
@@ -345,7 +305,7 @@ export function WheelExperience({ slug }: { slug: string }) {
             <p>CHÚC MỪNG BẠN!</p>
             <h2>{winner.name}</h2>
             <div className="winner-swatch" style={{ background: winner.color }} />
-            <small>Kết quả đã được lưu. Admin sẽ liên hệ để trao quà.</small>
+            <small>Kết quả đã được lưu. Hãy giữ màn hình này để đối chiếu khi nhận quà.</small>
             <button className="button button-primary" onClick={() => setWinner(null)}>
               Xem lịch sử
             </button>
